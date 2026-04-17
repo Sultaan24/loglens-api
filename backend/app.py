@@ -12,24 +12,50 @@ pattern = r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(GET|POST)\s(.*?)\sHTTP/.*"\
 # ---------------------------
 # Threat Detection
 # ---------------------------
-def detect_attack(path, status):
+def detect_attack(path, status, user_agent=""):
     path = path.lower()
+    user_agent = user_agent.lower()
 
-    if "union select" in path or "' or 1=1" in path:
+    # SQL Injection
+    sql_patterns = [
+        "union select",
+        "' or 1=1",
+        "or%201=1",
+        "sleep(",
+        "information_schema"
+    ]
+    if any(p in path for p in sql_patterns):
         return "sql_injection", "high"
 
-    elif "<script>" in path or "javascript:" in path:
-        return "xss", "medium"
+    # XSS
+    xss_patterns = [
+        "<script>",
+        "javascript:",
+        "onerror=",
+        "alert(",
+        "%3cscript%3e"
+    ]
+    if any(p in path for p in xss_patterns):
+        return "xss", "high"
 
-    elif "../" in path:
+    # Directory Traversal
+    if "../" in path or "..%2f" in path or "/etc/passwd" in path:
         return "directory_traversal", "high"
 
-    elif status == "401":
+    # Scanner / Bots
+    bot_patterns = ["sqlmap", "nikto", "nmap", "acunetix", "scanner"]
+    if any(b in user_agent for b in bot_patterns):
+        return "security_scanner", "medium"
+
+    # Brute Force
+    if status == "401":
         return "brute_force", "low"
 
-    else:
-        return "normal", "none"
+    # Suspicious Admin Access
+    if "/admin" in path or "/wp-admin" in path:
+        return "admin_probe", "medium"
 
+    return "normal", "none"
 
 # ---------------------------
 # Country / Geo Mock
@@ -66,7 +92,7 @@ def parse_lines(lines):
             referrer = match.group(6)
             user_agent = match.group(7)
 
-            attack, severity = detect_attack(path, status)
+            attack, severity = detect_attack(path, status, user_agent)
             country = get_country(ip)
 
             data = {
