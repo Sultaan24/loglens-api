@@ -12,7 +12,9 @@ import json
 
 app = Flask(__name__)
 CORS(app)
-with open("signatures.json", "r") as f:
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(BASE_DIR, "signatures.json"), "r") as f:
     signatures = json.load(f)
 
 
