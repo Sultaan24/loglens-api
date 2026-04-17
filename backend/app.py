@@ -2,9 +2,16 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import re
 import os
+import uuid
+import threading
+import time
+
+
+
 
 app = Flask(__name__)
 CORS(app)
+jobs = {}
 
 # Apache/Nginx Common Log Format + Referrer + User Agent
 pattern = r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(GET|POST)\s(.*?)\sHTTP/.*"\s(\d+)\s"(.*?)"\s"(.*?)"'
@@ -76,11 +83,26 @@ def get_country(ip):
 # ---------------------------
 # Main Parser Function
 # ---------------------------
+
 def parse_lines(lines):
     results = []
+    total_lines = 0
+    skipped_lines = 0
+    start_time = time.time()
 
     for line in lines:
-        line = line.decode("utf-8").strip()
+        total_lines += 1
+
+        try:
+            line = line.decode("utf-8", errors="ignore").strip()
+        except:
+            skipped_lines += 1
+            continue
+
+        if not line:
+            skipped_lines += 1
+            continue
+
         match = re.search(pattern, line)
 
         if match:
@@ -92,7 +114,7 @@ def parse_lines(lines):
             referrer = match.group(6)
             user_agent = match.group(7)
 
-            attack, severity = detect_attack(path, status, user_agent)
+            attack, severity = detect_attack(path, status)
             country = get_country(ip)
 
             data = {
@@ -109,8 +131,9 @@ def parse_lines(lines):
             }
 
             results.append(data)
+        else:
+            skipped_lines += 1
 
-    # Count attackers
     ip_count = {}
     for r in results:
         if r["attack"] != "normal":
@@ -122,19 +145,88 @@ def parse_lines(lines):
         "logs": results,
         "top_attackers": ip_count,
         "total_logs": len(results),
-        "total_attacks": total_attacks
+        "total_attacks": total_attacks,
+        "total_lines": total_lines,
+        "skipped_lines": skipped_lines,
+        "processing_time": round(time.time() - start_time, 2)
     }
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ---------------------------
 # Upload Route
 # ---------------------------
+def process_job(job_id, lines):
+    jobs[job_id]["status"] = "processing"
+    jobs[job_id]["progress"] = 10
+
+    time.sleep(1)
+
+    try:
+        jobs[job_id]["progress"] = 40
+
+        result = parse_lines(lines)
+
+        jobs[job_id]["progress"] = 90
+        time.sleep(1)
+
+        jobs[job_id]["status"] = "completed"
+        jobs[job_id]["progress"] = 100
+        jobs[job_id]["result"] = result
+
+    except Exception as e:
+        jobs[job_id]["status"] = "failed"
+        jobs[job_id]["error"] = str(e)
+
+@app.route("/upload_async", methods=["POST"])
+def upload_async():
+    file = request.files["file"]
+    lines = file.readlines()
+
+    job_id = str(uuid.uuid4())
+
+    jobs[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "result": None
+    }
+
+    thread = threading.Thread(
+        target=process_job,
+        args=(job_id, lines)
+    )
+    thread.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "queued"
+    })
+
+
 @app.route("/upload", methods=["POST"])
 def upload_file():
     file = request.files["file"]
-    lines = file.readlines()
-    result = parse_lines(lines)
+
+    def generate_lines():
+        for line in file.stream:
+            yield line
+
+    result = parse_lines(generate_lines())
     return jsonify(result)
+
+
+
+
 
 
 # ---------------------------
@@ -165,6 +257,16 @@ def home():
 # ---------------------------
 # Run App
 # ---------------------------
+@app.route("/status/<job_id>", methods=["GET"])
+def check_status(job_id):
+    job = jobs.get(job_id)
+
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    return jsonify(job)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
