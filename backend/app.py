@@ -1,17 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.security import check_password_hash
 import re
 import os
 import uuid
 import threading
 import time
-
-
+import requests
+import json
 
 
 app = Flask(__name__)
 CORS(app)
+with open("signatures.json", "r") as f:
+    signatures = json.load(f)
+
+
 jobs = {}
+ADMIN_USER = "admin"
+ADMIN_HASH = "scrypt:32768:8:1$evTJTBY8cP6WcaFX$46ab8f3cf959e508d3f45993a341598e2ff2e8029e1d7402dd7f9de0ee05245c8e706c00b7470d4d7c32d812620e769e4e1bed42bf96ecb5966c878297e47045"
 
 # Apache/Nginx Common Log Format + Referrer + User Agent
 pattern = r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(GET|POST)\s(.*?)\sHTTP/.*"\s(\d+)\s"(.*?)"\s"(.*?)"'
@@ -19,9 +26,25 @@ pattern = r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(GET|POST)\s(.*?)\sHTTP/.*"\
 # ---------------------------
 # Threat Detection
 # ---------------------------
-def detect_attack(path, status, user_agent=""):
+def detect_attack(path, status):
     path = path.lower()
-    user_agent = user_agent.lower()
+
+    for sig in signatures:
+        if sig["pattern"].lower() in path:
+            return sig["type"], sig["severity"]
+
+    if status == "401":
+        return "brute_force", "low"
+
+    return "normal", "none"
+
+
+
+
+
+
+
+
 
     # SQL Injection
     sql_patterns = [
@@ -67,17 +90,25 @@ def detect_attack(path, status, user_agent=""):
 # ---------------------------
 # Country / Geo Mock
 # ---------------------------
+
 def get_country(ip):
-    if ip.startswith("192.168"):
-        return "India"
-    elif ip.startswith("8.8"):
-        return "United States"
-    elif ip.startswith("45."):
-        return "Germany"
-    elif ip.startswith("127."):
-        return "Localhost"
-    else:
+    try:
+        if ip.startswith("127.") or ip.startswith("192.168"):
+            return "Local Network"
+
+        url = f"http://ip-api.com/json/{ip}?fields=country"
+        res = requests.get(url, timeout=2)
+        data = res.json()
+
+        return data.get("country", "Unknown")
+    except:
         return "Unknown"
+
+
+
+
+
+
 
 
 # ---------------------------
@@ -265,6 +296,33 @@ def check_status(job_id):
         return jsonify({"error": "Job not found"}), 404
 
     return jsonify(job)
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if username == ADMIN_USER and check_password_hash(ADMIN_HASH, password):
+        return jsonify({
+            "success": True,
+            "message": "Login successful"
+        })
+
+    return jsonify({
+        "success": False,
+        "message": "Invalid credentials"
+    }), 401
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
