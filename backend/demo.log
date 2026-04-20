@@ -1,5 +1,5 @@
-127.0.0.1 - - [10/Oct/2025:13:55:36] "GET /index.html HTTP/1.1" 200 "-" "Mozilla/5.0"
-192.168.1.1 - - [10/Oct/2025:14:00:00] "POST /login HTTP/1.1" 401 "-" "Chrome/120.0"
-192.168.1.5 - - [10/Oct/2025:14:10:00] "GET /index.php?id=1 UNION SELECT HTTP/1.1" 200 "-" "sqlmap/1.7"
-8.8.8.8 - - [10/Oct/2025:15:10:00] "GET /../../etc/passwd HTTP/1.1" 403 "-" "Scanner"
-45.33.22.11 - - [10/Oct/2025:16:00:00] "GET /search?q=<script>alert(1)</script> HTTP/1.1" 200 "-" "Bot"
+127.0.0.1 - - [10/Oct/2025:13:55:36 +0000] "GET /index.html HTTP/1.1" 200 2326
+192.168.1.1 - - [10/Oct/2025:13:56:36 +0000] "GET /login.php?id=' OR 1=1 HTTP/1.1" 200 1234
+10.0.0.1 - - [10/Oct/2025:13:57:36 +0000] "GET /<script>alert(1)</script> HTTP/1.1" 200 1111
+172.16.0.1 - - [10/Oct/2025:13:58:36 +0000] "GET /../../etc/passwd HTTP/1.1" 200 999
+8.8.8.8 - - [10/Oct/2025:13:59:36 +0000] "POST /login HTTP/1.1" 401 500
