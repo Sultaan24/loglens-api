@@ -300,12 +300,17 @@ def upload_file():
 # ---------------------------
 @app.route("/demo", methods=["GET"])
 def demo():
-    with open("demo.log", "rb") as f:
-        demo_lines = f.readlines()
+    try:
+        demo_path = os.path.join(BASE_DIR, "demo.log")
 
-    result = parse_lines(demo_lines)
-    return jsonify(result)
+        with open(demo_path, "rb") as f:
+            demo_lines = f.readlines()
 
+        result = parse_lines(demo_lines)
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 # ---------------------------
 # Home Route
 # ---------------------------
