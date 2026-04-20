@@ -300,17 +300,11 @@ def upload_file():
 # ---------------------------
 @app.route("/demo", methods=["GET"])
 def demo():
-    demo_lines = [
-        b'127.0.0.1 - - [10/Oct/2025:13:55:36] "GET /index.html HTTP/1.1" 200 "-" "Mozilla/5.0"',
-        b'192.168.1.1 - - [10/Oct/2025:14:00:00] "POST /login HTTP/1.1" 401 "-" "Chrome/120.0"',
-        b'192.168.1.5 - - [10/Oct/2025:14:10:00] "GET /index.php?id=1 UNION SELECT HTTP/1.1" 200 "-" "sqlmap/1.7"',
-        b'8.8.8.8 - - [10/Oct/2025:15:10:00] "GET /../../etc/passwd HTTP/1.1" 403 "-" "Scanner"',
-        b'45.33.22.11 - - [10/Oct/2025:16:00:00] "GET /search?q=<script>alert(1)</script> HTTP/1.1" 200 "-" "Bot"',
-    ]
+    with open("demo.log", "rb") as f:
+        demo_lines = f.readlines()
 
     result = parse_lines(demo_lines)
     return jsonify(result)
-
 
 # ---------------------------
 # Home Route
