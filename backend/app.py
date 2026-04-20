@@ -123,6 +123,15 @@ def parse_lines(lines):
     skipped_lines = 0
     start_time = time.time()
 
+    # Multiple log patterns
+    patterns = [
+        # Combined Log Format
+        r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(\S+)\s(.*?)\sHTTP/.*"\s(\d+)\s(\d+)\s"(.*?)"\s"(.*?)"',
+
+        # Common Log Format
+        r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(\S+)\s(.*?)\sHTTP/.*"\s(\d+)\s(\d+)'
+    ]
+
     for line in lines:
         total_lines += 1
 
@@ -136,34 +145,49 @@ def parse_lines(lines):
             skipped_lines += 1
             continue
 
-        match = re.search(pattern, line)
+        match = None
+
+        for p in patterns:
+            match = re.search(p, line)
+            if match:
+                break
 
         if match:
-            ip = match.group(1)
-            timestamp = match.group(2)
-            method = match.group(3)
-            path = match.group(4)
-            status = match.group(5)
-            referrer = match.group(6)
-            user_agent = match.group(7)
+            try:
+                ip = match.group(1)
+                timestamp = match.group(2)
+                method = match.group(3)
+                path = match.group(4)
+                status = match.group(5)
 
-            attack, severity = detect_attack(path, status)
-            country = get_country(ip)
+                # Combined format has referrer + user-agent
+                if len(match.groups()) >= 8:
+                    referrer = match.group(7)
+                    user_agent = match.group(8)
+                else:
+                    referrer = "-"
+                    user_agent = "-"
 
-            data = {
-                "ip": ip,
-                "timestamp": timestamp,
-                "method": method,
-                "path": path,
-                "status": status,
-                "referrer": referrer,
-                "user_agent": user_agent,
-                "attack": attack,
-                "severity": severity,
-                "country": country
-            }
+                attack, severity = detect_attack(path, status)
+                country = get_country(ip)
 
-            results.append(data)
+                data = {
+                    "ip": ip,
+                    "timestamp": timestamp,
+                    "method": method,
+                    "path": path,
+                    "status": status,
+                    "referrer": referrer,
+                    "user_agent": user_agent,
+                    "attack": attack,
+                    "severity": severity,
+                    "country": country
+                }
+
+                results.append(data)
+
+            except:
+                skipped_lines += 1
         else:
             skipped_lines += 1
 
