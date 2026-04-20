@@ -28,18 +28,27 @@ pattern = r'(\d+\.\d+\.\d+\.\d+)\s-\s-\s\[(.*?)\]\s"(GET|POST)\s(.*?)\sHTTP/.*"\
 # ---------------------------
 # Threat Detection
 # ---------------------------
-def detect_attack(path, status):
+# Track failed login attempts by IP
+failed_attempts = {}
+
+def detect_attack(path, status, ip=None):
     path = path.lower()
 
+    # Signature-based detection
     for sig in signatures:
         if sig["pattern"].lower() in path:
             return sig["type"], sig["severity"]
 
-    if status == "401":
-        return "brute_force", "low"
+    # Smarter brute-force detection
+    if status == "401" and ip:
+        failed_attempts[ip] = failed_attempts.get(ip, 0) + 1
+
+        if failed_attempts[ip] >= 3:
+            return "brute_force", "high"
+        else:
+            return "failed_login", "low"
 
     return "normal", "none"
-
 
 
 
@@ -168,7 +177,7 @@ def parse_lines(lines):
                     referrer = "-"
                     user_agent = "-"
 
-                attack, severity = detect_attack(path, status)
+                attack, severity = detect_attack(path, status, ip)
                 country = get_country(ip)
 
                 data = {
