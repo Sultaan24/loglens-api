@@ -201,14 +201,33 @@ def parse_lines(lines):
             skipped_lines += 1
 
     ip_count = {}
+    ip_count = {}
     for r in results:
         if r["attack"] != "normal":
             ip_count[r["ip"]] = ip_count.get(r["ip"], 0) + 1
 
     total_attacks = len([x for x in results if x["attack"] != "normal"])
 
+    timeline = {}
+    for r in results:
+        if r["attack"] != "normal":
+            try:
+                hour = r["timestamp"].split(":")[1]
+                label = hour + ":00"
+                timeline[label] = timeline.get(label, 0) + 1
+            except:
+                pass
+
+    timeline_data = []
+    for hour, count in sorted(timeline.items()):
+        timeline_data.append({
+            "time": hour,
+            "count": count
+        })
+
     return {
         "logs": results,
+        "timeline": timeline_data,
         "top_attackers": ip_count,
         "total_logs": len(results),
         "total_attacks": total_attacks,
@@ -216,6 +235,7 @@ def parse_lines(lines):
         "skipped_lines": skipped_lines,
         "processing_time": round(time.time() - start_time, 2)
     }
+
 
 
 
